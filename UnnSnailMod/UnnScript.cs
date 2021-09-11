@@ -5,23 +5,30 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using UnityEngine;
+using GlobalEnums;
 
 namespace UnnSnailMod
 {
+    public delegate bool Hero_CheckStillTouchingWall(CollisionSide side, bool checkTop = false);
     public class UnnScript : MonoBehaviour
     {
+        MethodInfo MInfo_Hero_CheckStillTouchingWall = typeof(HeroController).GetMethod("CheckStillTouchingWall", BindingFlags.NonPublic |
+                BindingFlags.Instance);
+        Hero_CheckStillTouchingWall CheckStillTouchingWall = null;
         MeshRenderer renderer = null;
         tk2dSpriteAnimator anim = null;
         Rigidbody2D rig = null;
         void OnEnable()
         {
+            CheckStillTouchingWall = (Hero_CheckStillTouchingWall)MInfo_Hero_CheckStillTouchingWall
+                .CreateDelegate(typeof(Hero_CheckStillTouchingWall),HeroController.instance);
+
             renderer = GetComponent<MeshRenderer>();
             anim = GetComponent<tk2dSpriteAnimator>();
             rig = HeroController.instance.GetComponent<Rigidbody2D>();
             HeroController.instance.OnTakenDamage += Instance_OnTakenDamage;
             HeroController.instance.OnDeath += Instance_OnDeath;
 
-            On.HeroController.CanWallJump += HeroController_CanWallJump;
             On.HeroController.Attack += HeroController_Attack;
             On.HeroController.CanDreamNail += HeroController_CanDreamNail;
             On.HeroController.CanDreamGate += HeroController_CanDreamGate;
@@ -101,16 +108,10 @@ namespace UnnSnailMod
             return false;
         }
 
-        private void HeroController_Attack(On.HeroController.orig_Attack orig, HeroController self, GlobalEnums.AttackDirection attackDir)
+        private void HeroController_Attack(On.HeroController.orig_Attack orig, HeroController self, AttackDirection attackDir)
         {
-            orig(self, GlobalEnums.AttackDirection.normal);
+            orig(self, AttackDirection.normal);
         }
-
-        private bool HeroController_CanWallJump(On.HeroController.orig_CanWallJump orig, HeroController self)
-        {
-            return false;
-        }
-
         private void Instance_OnTakenDamage()
         {
             anim.Play(UnnSnail.burst);
@@ -148,27 +149,20 @@ namespace UnnSnailMod
                 HeroController.instance.ResetAirMoves();
             }
         }
-        public readonly static int terrainLayerMask = LayerMask.GetMask(LayerMask.LayerToName((int)GlobalEnums.PhysLayers.TERRAIN));
         IEnumerator TryWalkOnWall()
         {
-            yield break;
             if (!TryInvoke("WALK_ON_WALL")) yield break;
             try
             {
+                transform.SetRotationZ(-90);
                 HeroActions hc = InputHandler.Instance.inputActions;
-
+                HeroController hero = HeroController.instance;
 
                 while (GameManager.instance.IsGameplayScene())
                 {
-                    RaycastHit2D? left = Physics2D.RaycastAll(transform.position,
-                        Vector2.left, 4, Physics2D.AllLayers
-                        )?.FirstOrDefault(x => x.collider?.gameObject.layer == (int)GlobalEnums.PhysLayers.TERRAIN);
-                    RaycastHit2D? right = Physics2D.RaycastAll(transform.position,
-                        Vector2.right, 4, Physics2D.AllLayers
-                        )?.FirstOrDefault(x => x.collider?.gameObject.layer == (int)GlobalEnums.PhysLayers.TERRAIN);
-                    if (left?.collider == null || right?.collider == null) break;
+                    if (! hero.touchingWallL && !hero.touchingWallR) break;
                     HeroController.instance.AffectedByGravity(false);
-                    transform.SetRotationZ(90);
+                    
                     transform.localPosition = new Vector3(1.1f, 0, 0);
 
                     if (hc.up.IsPressed)
@@ -178,6 +172,8 @@ namespace UnnSnailMod
                             anim.Play(UnnSnail.walk);
                         }
                         rig.velocity = new Vector2(0, HeroController.instance.WALK_SPEED);
+                        transform.SetRotationZ(-90);
+                        transform.SetScaleY(1);
                     }
                     else if (hc.down.IsPressed)
                     {
@@ -186,10 +182,12 @@ namespace UnnSnailMod
                             anim.Play(UnnSnail.walk);
                         }
                         rig.velocity = new Vector2(0, -HeroController.instance.WALK_SPEED);
+                        transform.SetRotationZ(90);
+                        transform.SetScaleY(-1);
                     }
                     else
                     {
-                        Idle();
+                        rig.velocity = new Vector2(rig.velocity.x, 0);
                     }
                     yield return null;
                 }
@@ -199,7 +197,7 @@ namespace UnnSnailMod
                 HeroController.instance.AffectedByGravity(true);
                 transform.rotation = new Quaternion(0, 0, 0, 0);
                 transform.localPosition = Vector3.zero;
-
+                transform.SetScaleY(1);
                 EndInvoke("WALK_ON_WALL");
             }
         }
@@ -240,11 +238,12 @@ namespace UnnSnailMod
             HeroController.instance.OnTakenDamage -= Instance_OnTakenDamage;
             HeroController.instance.OnDeath -= Instance_OnDeath;
 
-            On.HeroController.CanWallJump -= HeroController_CanWallJump;
             On.HeroController.Attack -= HeroController_Attack;
             On.HeroController.CanDreamNail -= HeroController_CanDreamNail;
             On.HeroController.CanDreamGate -= HeroController_CanDreamGate;
             On.HeroController.CanCast -= HeroController_CanCast;
+
+            On.tk2dSpriteAnimator.LateUpdate -= Tk2dSpriteAnimator_LateUpdate;
 
             On.HutongGames.PlayMaker.Actions.ActivateGameObject.OnEnter -= ActivateGameObject_OnEnter;
             On.HutongGames.PlayMaker.Actions.Tk2dWatchAnimationEvents.OnEnter -= Tk2dWatchAnimationEvents_OnEnter;

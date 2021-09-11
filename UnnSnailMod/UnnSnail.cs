@@ -8,19 +8,86 @@ using UnityEngine;
 using HutongGames.PlayMaker;
 using HutongGames.PlayMaker.Actions;
 using ModCommon;
+using ModCommon.Util;
 
 namespace UnnSnailMod
 {
     public class UnnSnail : Mod
     {
+
+        class HeroScript : MonoBehaviour
+        {
+            public UnnSnail UnnSnail = null;
+            bool c = false;
+            void FixedUpdate()
+            {
+                if (!c)
+                {
+                    try
+                    {
+                        PlayMakerFSM pm = FindObjectsOfType<PlayMakerFSM>().FirstOrDefault(x => x.FsmName == "UI Charms");
+                        pm.InsertMethod("Black Charm? 2", 0, () =>
+                        {
+                            if (pm.FsmVariables.FindFsmInt("Current Item Number").Value == 28 && Test)
+                            {
+                                pm.SendEvent("CANCEL");
+                            }
+                        });
+                        pm.InsertMethod("Black Charm?", 0, () =>
+                        {
+                            if (pm.FsmVariables.FindFsmInt("Current Item Number").Value == 28 && Test)
+                            {
+                                pm.SendEvent("CANCEL");
+                            }
+                        });
+                        c = true;
+                    }
+                    catch (Exception)
+                    {
+
+                    }
+                }
+            }
+        }
         GameObject unnAnim = null;
         public static string idle = "Slug Idle";
         public static string burst = "Slug Burst";
         public static string turn = "Slug Turn";
         public static string walk = "Slug Walk";
+
+        public static bool Test = true;
         public override void Initialize()
         {
             ModHooks.CharmUpdateHook += ModHooks_CharmUpdateHook;
+            ModHooks.LanguageGetHook += ModHooks_LanguageGetHook;
+            ModHooks.HeroUpdateHook += ModHooks_HeroUpdateHook;
+            ModHooks.AfterSavegameLoadHook += ModHooks_AfterSavegameLoadHook;
+        }
+
+        private void ModHooks_AfterSavegameLoadHook(SaveGameData obj)
+        {
+            if (Test)
+            {
+                if (!obj.playerData.equippedCharms.Contains(28)) obj.playerData.equippedCharms.Add(28);
+                obj.playerData.equippedCharm_28 = true;
+            }
+        }
+
+        private void ModHooks_HeroUpdateHook()
+        {
+            HeroController.instance.gameObject.GetOrAddComponent<HeroScript>().UnnSnail = this;
+        }
+
+        private string ModHooks_LanguageGetHook(string key, string sheetTitle, string orig)
+        {
+            if (key == "CHARM_DESC_28")
+            {
+                if (Test) {
+                    return "包含了乌恩的力量\n\n这个护符是持有者的一部分，不能卸下";
+                }
+                return "包含了乌恩的力量";
+            }
+            return orig;
         }
 
         private void ModHooks_CharmUpdateHook(PlayerData data, HeroController controller)
