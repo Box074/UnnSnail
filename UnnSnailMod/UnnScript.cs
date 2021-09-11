@@ -140,7 +140,7 @@ namespace UnnSnailMod
                 Turn(true);
                 StartCoroutine(TryWalkOnWall());
             }
-            else
+            else if (!HeroController.instance.touchingWallL && !HeroController.instance.touchingWallR)
             {
                 Idle();
             }
@@ -163,7 +163,7 @@ namespace UnnSnailMod
                     if (! hero.touchingWallL && !hero.touchingWallR) break;
                     HeroController.instance.AffectedByGravity(false);
                     
-                    transform.localPosition = new Vector3(1.1f, 0, 0);
+                    transform.localPosition = new Vector3(1.1f, -0.7f, 0);
 
                     if (hc.up.IsPressed)
                     {
@@ -187,6 +187,7 @@ namespace UnnSnailMod
                     }
                     else
                     {
+                        Idle();
                         rig.velocity = new Vector2(rig.velocity.x, 0);
                     }
                     yield return null;

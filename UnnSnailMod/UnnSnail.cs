@@ -55,7 +55,7 @@ namespace UnnSnailMod
         public static string turn = "Slug Turn";
         public static string walk = "Slug Walk";
 
-        public static bool Test = true;
+        public static bool Test = false;
         public override void Initialize()
         {
             ModHooks.CharmUpdateHook += ModHooks_CharmUpdateHook;
