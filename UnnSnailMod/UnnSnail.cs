@@ -55,13 +55,19 @@ namespace UnnSnailMod
         public static string turn = "Slug Turn";
         public static string walk = "Slug Walk";
 
-        public static bool Test = false;
+        public static bool Test = true;
         public override void Initialize()
         {
             ModHooks.CharmUpdateHook += ModHooks_CharmUpdateHook;
             ModHooks.LanguageGetHook += ModHooks_LanguageGetHook;
             ModHooks.HeroUpdateHook += ModHooks_HeroUpdateHook;
             ModHooks.AfterSavegameLoadHook += ModHooks_AfterSavegameLoadHook;
+            ModHooks.BeforeSavegameSaveHook += ModHooks_BeforeSavegameSaveHook;
+        }
+
+        private void ModHooks_BeforeSavegameSaveHook(SaveGameData obj)
+        {
+            obj.playerData.charmCost_28 = 2;
         }
 
         private void ModHooks_AfterSavegameLoadHook(SaveGameData obj)
@@ -70,6 +76,7 @@ namespace UnnSnailMod
             {
                 if (!obj.playerData.equippedCharms.Contains(28)) obj.playerData.equippedCharms.Add(28);
                 obj.playerData.equippedCharm_28 = true;
+                obj.playerData.charmCost_28 = 0;
             }
         }
 

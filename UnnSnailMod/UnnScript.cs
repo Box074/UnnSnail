@@ -149,6 +149,8 @@ namespace UnnSnailMod
                 HeroController.instance.ResetAirMoves();
             }
         }
+        bool vcUp = false;
+        bool vcDown = false;
         IEnumerator TryWalkOnWall()
         {
             if (!TryInvoke("WALK_ON_WALL")) yield break;
@@ -157,51 +159,109 @@ namespace UnnSnailMod
                 transform.SetRotationZ(-90);
                 HeroActions hc = InputHandler.Instance.inputActions;
                 HeroController hero = HeroController.instance;
+                Collider2D col2d = HeroController.instance.GetComponent<Collider2D>();
 
+                bool lastNearLeft = false;
+                bool lastNearTop = false;
+                bool lastNearRight = false;
                 while (GameManager.instance.IsGameplayScene())
                 {
-                    if (! hero.touchingWallL && !hero.touchingWallR) break;
+                    Vector2 origin = new Vector2(col2d.bounds.min.x, col2d.bounds.max.y);
+                    Vector2 origin2 = new Vector2(col2d.bounds.max.x, col2d.bounds.max.y);
+
+                    RaycastHit2D left_top = Physics2D.Raycast(origin, Vector2.up, 0.1f, 256);
+                    RaycastHit2D right_top = Physics2D.Raycast(origin2, Vector2.up, 0.1f, 256);
+                    bool top = left_top.collider != null || right_top.collider != null;
+                    //bool top = hero.CheckNearRoof();
+                    bool near = hero.touchingWallL || hero.touchingWallR;
+                    if (!near && !top)
+                    {
+                        if (lastNearTop && hc.up.IsPressed & false) //TODO
+                        {
+                            rig.velocity = new Vector2(0, hero.RUN_SPEED * 4);
+                            yield return new WaitForSeconds(0.1f);
+                            rig.velocity = new Vector2(hero.cState.facingRight ? -hero.RUN_SPEED * 2 : hero.RUN_SPEED * 2, 0);
+                            yield return new WaitForSeconds(0.1f);
+                            lastNearLeft = hero.touchingWallL;
+                            lastNearRight = hero.touchingWallR;
+                            lastNearTop = top;
+                            continue;
+                        }
+                        break;
+                    }
+                    lastNearLeft = hero.touchingWallL;
+                    lastNearRight = hero.touchingWallR;
+                    lastNearTop = top;
                     HeroController.instance.AffectedByGravity(false);
                     
                     transform.localPosition = new Vector3(1.1f, -0.7f, 0);
 
-                    if (hc.up.IsPressed)
+                    On.HeroController.CanAttack -= HeroController_CanAttack;
+
+                    if (near)
                     {
-                        if (!anim.IsPlaying(UnnSnail.walk))
+                        On.HeroController.CanAttack += HeroController_CanAttack;
+                        if ((hc.up.IsPressed && !vcDown) || vcUp)
                         {
-                            anim.Play(UnnSnail.walk);
+                            if (!anim.IsPlaying(UnnSnail.walk))
+                            {
+                                anim.Play(UnnSnail.walk);
+                            }
+                            rig.velocity = new Vector2(0, HeroController.instance.WALK_SPEED);
+                            transform.SetRotationZ(-90);
+                            transform.SetScaleY(1);
                         }
-                        rig.velocity = new Vector2(0, HeroController.instance.WALK_SPEED);
-                        transform.SetRotationZ(-90);
-                        transform.SetScaleY(1);
-                    }
-                    else if (hc.down.IsPressed)
-                    {
-                        if (!anim.IsPlaying(UnnSnail.walk))
+                        else if ((hc.down.IsPressed && !vcUp)|| vcDown)
                         {
-                            anim.Play(UnnSnail.walk);
+                            if (!anim.IsPlaying(UnnSnail.walk))
+                            {
+                                anim.Play(UnnSnail.walk);
+                            }
+                            rig.velocity = new Vector2(0, -HeroController.instance.WALK_SPEED);
+                            transform.SetRotationZ(90);
+                            transform.SetScaleY(-1);
                         }
-                        rig.velocity = new Vector2(0, -HeroController.instance.WALK_SPEED);
-                        transform.SetRotationZ(90);
-                        transform.SetScaleY(-1);
+                        else
+                        {
+                            Idle();
+                            rig.velocity = new Vector2(rig.velocity.x, 0);
+                        }
                     }
-                    else
+                    if (top)
                     {
-                        Idle();
-                        rig.velocity = new Vector2(rig.velocity.x, 0);
+                        if (!near)
+                        {
+                            transform.SetRotationZ(0);
+                            transform.SetScaleY(-1);
+                            transform.localPosition = new Vector2(0,-1.43f);
+                            if (hc.dash.IsPressed)
+                            {
+                                break;
+                            }
+                        }
                     }
                     yield return null;
                 }
             }
             finally
             {
-                HeroController.instance.AffectedByGravity(true);
+                if (!HeroController.instance.cState.swimming)
+                {
+                    HeroController.instance.AffectedByGravity(true);
+                }
+                On.HeroController.CanAttack -= HeroController_CanAttack;
                 transform.rotation = new Quaternion(0, 0, 0, 0);
                 transform.localPosition = Vector3.zero;
                 transform.SetScaleY(1);
                 EndInvoke("WALK_ON_WALL");
             }
         }
+
+        private bool HeroController_CanAttack(On.HeroController.orig_CanAttack orig, HeroController self)
+        {
+            return false;
+        }
+
         void Idle()
         {
             if (!anim.IsPlaying(UnnSnail.idle))
